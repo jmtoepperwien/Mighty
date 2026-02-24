@@ -1,0 +1,287 @@
+hydra:
+  run:
+    dir: ${outdir}
+  sweep:
+    dir: ${baserundir}
+    subdir: ${optimizer_id}/${benchmark_id}/${task_id}/${seed}
+  launcher:
+    _target_: hydra._internal.core_plugins.basic_launcher.BasicLauncher
+  sweeper:
+    _target_: hydra._internal.core_plugins.basic_sweeper.BasicSweeper
+    max_batch_size: null
+    params: null
+  help:
+    app_name: ${hydra.job.name}
+    header: '${hydra.help.app_name} is powered by Hydra.
+
+      '
+    footer: 'Powered by Hydra (https://hydra.cc)
+
+      Use --hydra-help to view Hydra specific help
+
+      '
+    template: '${hydra.help.header}
+
+      == Configuration groups ==
+
+      Compose your configuration from those groups (group=option)
+
+
+      $APP_CONFIG_GROUPS
+
+
+      == Config ==
+
+      Override anything in the config (foo.bar=value)
+
+
+      $CONFIG
+
+
+      ${hydra.help.footer}
+
+      '
+  hydra_help:
+    template: 'Hydra (${hydra.runtime.version})
+
+      See https://hydra.cc for more info.
+
+
+      == Flags ==
+
+      $FLAGS_HELP
+
+
+      == Configuration groups ==
+
+      Compose your configuration from those groups (For example, append hydra/job_logging=disabled
+      to command line)
+
+
+      $HYDRA_CONFIG_GROUPS
+
+
+      Use ''--cfg hydra'' to Show the Hydra config.
+
+      '
+    hydra_help: ???
+  hydra_logging:
+    version: 1
+    formatters:
+      colorlog:
+        (): colorlog.ColoredFormatter
+        format: '[%(cyan)s%(asctime)s%(reset)s][%(purple)sHYDRA%(reset)s] %(message)s'
+    handlers:
+      console:
+        class: logging.StreamHandler
+        formatter: colorlog
+        stream: ext://sys.stdout
+    root:
+      level: INFO
+      handlers:
+      - console
+    disable_existing_loggers: false
+  job_logging:
+    version: 1
+    formatters:
+      simple:
+        format: '[%(asctime)s][%(name)s][%(levelname)s] - %(message)s'
+      colorlog:
+        (): colorlog.ColoredFormatter
+        format: '[%(cyan)s%(asctime)s%(reset)s][%(blue)s%(name)s%(reset)s][%(log_color)s%(levelname)s%(reset)s]
+          - %(message)s'
+        log_colors:
+          DEBUG: purple
+          INFO: green
+          WARNING: yellow
+          ERROR: red
+          CRITICAL: red
+    handlers:
+      console:
+        class: logging.StreamHandler
+        formatter: colorlog
+        stream: ext://sys.stdout
+      file:
+        class: logging.FileHandler
+        formatter: simple
+        filename: ${hydra.job.name}.log
+    root:
+      level: INFO
+      handlers:
+      - console
+      - file
+    disable_existing_loggers: false
+  env: {}
+  mode: MULTIRUN
+  searchpath:
+  - pkg://dacboenv/configs
+  - pkg://adaptaf/configs
+  - pkg://optbench/configs
+  callbacks: {}
+  output_subdir: .hydra
+  overrides:
+    hydra:
+    - hydra.searchpath=['pkg://dacboenv/configs','pkg://adaptaf/configs','pkg://optbench/configs']
+    - hydra.mode=MULTIRUN
+    task:
+    - seed=39590,29732,23927
+    - +task/BBOB=cfg_2_1_0
+    - +optimizer/smac20=blackbox
+    - baserundir=reference_performance
+  job:
+    name: run
+    chdir: null
+    override_dirname: +optimizer/smac20=blackbox,+task/BBOB=cfg_2_1_0,baserundir=reference_performance,seed=39590,29732,23927
+    id: ???
+    num: ???
+    config_name: base.yaml
+    env_set: {}
+    env_copy: []
+    config:
+      override_dirname:
+        kv_sep: '='
+        item_sep: ','
+        exclude_keys: []
+  runtime:
+    version: 1.3.2
+    version_base: '1.3'
+    cwd: /home/mtoepperwien/Documents/Mighty
+    config_sources:
+    - path: hydra.conf
+      schema: pkg
+      provider: hydra
+    - path: /home/mtoepperwien/Documents/Mighty/.venv/lib/python3.11/site-packages/carps/configs
+      schema: file
+      provider: main
+    - path: hydra_plugins.hydra_colorlog.conf
+      schema: pkg
+      provider: hydra-colorlog
+    - path: dacboenv.configs
+      schema: pkg
+      provider: hydra.searchpath in command-line
+    - path: adaptaf.configs
+      schema: pkg
+      provider: hydra.searchpath in command-line
+    - path: optbench.configs
+      schema: pkg
+      provider: hydra.searchpath in command-line
+    - path: ''
+      schema: structured
+      provider: schema
+    output_dir: ???
+    choices:
+      optimizer/smac20: blackbox
+      task/BBOB: cfg_2_1_0
+      hydra/env: default
+      hydra/callbacks: null
+      hydra/job_logging: colorlog
+      hydra/hydra_logging: colorlog
+      hydra/hydra_help: default
+      hydra/help: default
+      hydra/sweeper: basic
+      hydra/launcher: basic
+      hydra/output: default
+  verbose: false
+seed: 1
+task:
+  _target_: carps.utils.task.Task
+  name: bbob/2/1/0
+  seed: ${seed}
+  objective_function:
+    _target_: carps.objective_functions.bbob.BBOBObjectiveFunction
+    dimension: 2
+    fid: 1
+    instance: 0
+    seed: ${seed}
+  input_space:
+    _target_: carps.utils.task.InputSpace
+    configuration_space:
+      _target_: ConfigSpace.configuration_space.ConfigurationSpace.from_serialized_dict
+      _convert_: object
+      d:
+        name: null
+        hyperparameters:
+        - type: uniform_float
+          name: x0
+          lower: -5.0
+          upper: 5.0
+          default_value: 0.0
+          log: false
+          meta: null
+        - type: uniform_float
+          name: x1
+          lower: -5.0
+          upper: 5.0
+          default_value: 0.0
+          log: false
+          meta: null
+        conditions: []
+        forbiddens: []
+        python_module_version: 1.2.0
+        format_version: 0.4
+    fidelity_space:
+      _target_: carps.utils.task.FidelitySpace
+      is_multifidelity: false
+      fidelity_type: null
+      min_fidelity: null
+      max_fidelity: null
+    instance_space: null
+  output_space:
+    _target_: carps.utils.task.OutputSpace
+    n_objectives: 1
+    objectives:
+    - quality
+  optimization_resources:
+    _target_: carps.utils.task.OptimizationResources
+    n_trials: 77
+    time_budget: null
+    n_workers: 1
+  metadata:
+    _target_: carps.utils.task.TaskMetadata
+    has_constraints: false
+    domain: synthetic
+    objective_function_approximation: real
+    has_virtual_time: false
+    deterministic: true
+    dimensions: 2
+    search_space_n_categoricals: 0
+    search_space_n_ordinals: 0
+    search_space_n_integers: 0
+    search_space_n_floats: 2
+    search_space_has_conditionals: false
+    search_space_has_forbiddens: false
+    search_space_has_priors: false
+benchmark_id: BBOB
+task_id: ${task.name}
+optimizer:
+  _target_: carps.optimizers.smac20.SMAC3Optimizer
+  _partial_: true
+  smac_cfg:
+    scenario:
+      seed: ${seed}
+      n_trials: ${task.optimization_resources.n_trials}
+      objectives: ${task.output_space.objectives}
+      deterministic: true
+      n_workers: 1
+      output_directory: ${outdir}/${seed}/smac3_output
+      min_budget: ${task.input_space.fidelity_space.min_fidelity}
+      max_budget: ${task.input_space.fidelity_space.max_fidelity}
+    smac_kwargs:
+      dask_client: null
+      overwrite: true
+    smac_class: smac.facade.blackbox_facade.BlackBoxFacade
+optimizer_id: SMAC3-BlackBoxFacade
+optimizer_container_id: SMAC3
+pyexperimenter_configuration_file_path: null
+database_credential_file_path: null
+use_special_conda_env: false
+conda_env_name: carps_${benchmark_id}_${optimizer_container_id}
+timestamp: ${now:%Y-%m-%d}/${now:%H-%M-%S}
+baserundir: reference_performance
+outdir: ${baserundir}/${optimizer_id}/${benchmark_id}/${task_id}/${seed}
+loggers:
+- _target_: carps.loggers.file_logger.FileLogger
+  _partial_: true
+  overwrite: true
+- _target_: carps.loggers.database_logger.DatabaseLogger
+  _partial_: true

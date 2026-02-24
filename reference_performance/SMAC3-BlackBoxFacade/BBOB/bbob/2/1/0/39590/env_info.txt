@@ -1,0 +1,6 @@
+Python Environment Information
+================================
+Python Version: 3.11.14 (main, Oct  9 2025, 16:16:55) [GCC 15.2.0]
+Python Executable: /home/mtoepperwien/Documents/Mighty/.venv/bin/python
+Failed to run pip freeze:
+[Errno 2] No such file or directory: 'pip'

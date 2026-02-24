@@ -1,0 +1,4 @@
+- seed=39590
+- +task/BBOB=cfg_2_1_0
+- +optimizer/smac20=blackbox
+- baserundir=reference_performance

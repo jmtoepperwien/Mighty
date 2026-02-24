@@ -1,0 +1,17 @@
+# @package _global_
+
+num_steps: 1e5
+env: DACBOBenchmark
+env_kwargs: 
+  task_ids: [ "bbob/2/1/0" ]
+  config_space:
+    dim1: 
+      type: float
+      lower: 0.0
+      upper: 1.0
+    dim2:
+      type: float
+      lower: 0.0
+      upper: 1.0
+env_wrappers: []
+num_envs: 16
