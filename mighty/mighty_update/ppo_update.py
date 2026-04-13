@@ -52,7 +52,7 @@ class PPOUpdate:
         value_params = list(model.value_head.parameters())
 
         extra_params = []
-        if getattr(model, "continuous_action", False) and hasattr(model, "log_std"):
+        if getattr(model, "continuous_action", False) and model.log_std is not None:
             extra_params.append(model.log_std)
 
         self.optimizer = optim.Adam(
