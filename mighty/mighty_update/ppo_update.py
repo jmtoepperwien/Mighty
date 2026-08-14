@@ -53,7 +53,11 @@ class PPOUpdate:
 
         extra_params = []
         if getattr(model, "continuous_action", False) and hasattr(model, "log_std"):
-            extra_params.append(model.log_std)
+            # log_std is None in tanh_squash and beta modes (no separate learnable
+            # log_std parameter in either); only append it when it's an actual
+            # Parameter, otherwise Adam rejects the param group.
+            if model.log_std is not None:
+                extra_params.append(model.log_std)
 
         self.optimizer = optim.Adam(
             [
@@ -130,8 +134,17 @@ class PPOUpdate:
                     # Get model output
                     model_output = self.model(mb.observations)
 
-                    # NEW: Handle both modes
-                    if hasattr(self.model, "tanh_squash") and self.model.tanh_squash:
+                    # output_style is checked first, since the beta branch's
+                    # 3-tuple (action, alpha, beta) would otherwise collide with
+                    # the standard-PPO 3-tuple below.
+                    if getattr(self.model, "output_style", None) == "beta":
+                        # Beta mode: native log-prob, no latents/Jacobian correction
+                        # needed since Beta's support already matches [0, 1].
+                        _, alpha, beta_param = model_output
+                        dist = torch.distributions.Beta(alpha, beta_param)
+                        log_probs = dist.log_prob(mb.actions).sum(-1)
+
+                    elif hasattr(self.model, "tanh_squash") and self.model.tanh_squash:
                         # Tanh squashing mode (existing logic)
                         _, _, mean, log_std = model_output  # 4-tuple
                         dist = torch.distributions.Normal(mean, log_std.exp())
@@ -177,7 +190,12 @@ class PPOUpdate:
                     if self.model.continuous_action:
                         model_output_new = self.model(mb.observations)
 
-                        if (
+                        if getattr(self.model, "output_style", None) == "beta":
+                            # Beta mode
+                            _, alpha_new, beta_new = model_output_new
+                            dist_new = torch.distributions.Beta(alpha_new, beta_new)
+                            new_lp = dist_new.log_prob(mb.actions).sum(-1)
+                        elif (
                             hasattr(self.model, "tanh_squash")
                             and self.model.tanh_squash
                         ):

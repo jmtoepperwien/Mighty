@@ -61,6 +61,7 @@ class MightyPPOAgent(MightyAgent):
         normalize_reward: bool = False,
         rescale_action: bool = False,
         tanh_squash: bool = False,
+        policy_dist: str = "gaussian",
     ):
         """Initialize the PPO agent.
 
@@ -91,6 +92,7 @@ class MightyPPOAgent(MightyAgent):
         :param entropy_coef: Coefficient for the entropy loss
         :param max_grad_norm: Maximum gradient norm
         :param n_gradient_steps: Number of gradient steps per update
+        :param policy_dist: Continuous-action policy distribution ("gaussian" or "beta")
         """
 
         self.total_timesteps = total_timesteps
@@ -111,6 +113,7 @@ class MightyPPOAgent(MightyAgent):
         self.use_value_clip = use_value_clip
         self.value_clip_eps = value_clip_eps
         self.tanh_squash = tanh_squash
+        self.policy_dist = policy_dist
 
         # Placeholder variables which are filled in self._initialize_agent
         self.model: PPOModel | None = None
@@ -177,6 +180,7 @@ class MightyPPOAgent(MightyAgent):
             ),
             continuous_action=not self.discrete_action,
             tanh_squash=self.tanh_squash,
+            policy_dist=self.policy_dist,
         )
         self.policy = self.policy_class(
             algo=self,

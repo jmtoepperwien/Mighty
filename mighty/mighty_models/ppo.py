@@ -3,16 +3,13 @@ from typing import Tuple
 
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 
 from mighty.mighty_models.networks import ACTIVATIONS, make_feature_extractor
 
 
 class PPOModel(nn.Module):
     """PPO Model with policy and value networks."""
-
-    output_style = (
-        "squashed_gaussian"  # For continuous actions, we use squashed Gaussian output
-    )
 
     def __init__(
         self,
@@ -22,10 +19,20 @@ class PPOModel(nn.Module):
         log_std_min: float = -20.0,
         log_std_max: float = 2.0,
         tanh_squash: bool = False,  # NEW: Toggle between tanh squashing and standard PPO
+        policy_dist: str = "gaussian",  # "gaussian" or "beta"
         **kwargs,
     ):
         """Initialize the PPO model."""
         super().__init__()
+
+        assert policy_dist in ("gaussian", "beta"), (
+            f"policy_dist must be 'gaussian' or 'beta', got '{policy_dist}'"
+        )
+        assert not (policy_dist == "beta" and tanh_squash), (
+            "policy_dist='beta' and tanh_squash=True are mutually exclusive: "
+            "Beta distributions already have bounded [0, 1] support, so tanh "
+            "squashing is neither needed nor supported in beta mode."
+        )
 
         self.obs_size = int(obs_shape)
         self.action_size = int(action_size)
@@ -33,6 +40,20 @@ class PPOModel(nn.Module):
         self.log_std_min = log_std_min
         self.log_std_max = log_std_max
         self.tanh_squash = tanh_squash
+        self.policy_dist = policy_dist
+
+        # output_style is an instance attribute (not class-level) so it can vary
+        # per constructor arg; used by exploration policies / PPOUpdate as the
+        # dispatch discriminator (checked before tuple-length, since the beta
+        # and standard-PPO branches both return 3-tuples).
+        if self.continuous_action and self.tanh_squash:
+            self.output_style = "squashed_gaussian"
+        elif self.continuous_action and self.policy_dist == "beta":
+            self.output_style = "beta"
+        elif self.continuous_action:
+            self.output_style = "standard_ppo"
+        else:
+            self.output_style = "discrete"
 
         # Extract configuration from kwargs or use defaults
         head_kwargs = kwargs.get(
@@ -69,6 +90,11 @@ class PPOModel(nn.Module):
                 # Tanh squashing mode: output mean + log_std from network
                 final_out_dim = action_size * 2
                 # No learnable parameter needed
+                self.log_std = None
+            elif self.policy_dist == "beta":
+                # Beta mode: output alpha + beta from network, no learnable
+                # log_std parameter (Beta has no separate scale parameter).
+                final_out_dim = action_size * 2
                 self.log_std = None
             else:
                 # Standard PPO mode: output only mean, use learnable log_std parameter
@@ -126,7 +152,8 @@ class PPOModel(nn.Module):
         Returns:
         - If discrete: logits tensor
         - If continuous + tanh_squash: (action, z, mean, log_std)
-        - If continuous + not tanh_squash: (action, mean, log_std)
+        - If continuous + policy_dist == "beta": (action, alpha, beta)
+        - If continuous + not tanh_squash + policy_dist == "gaussian": (action, mean, log_std)
         """
 
         if self.continuous_action:
@@ -144,6 +171,21 @@ class PPOModel(nn.Module):
                 action = torch.tanh(z)  # squash to [−1, +1]
 
                 return action, z, mean, log_std
+
+            elif self.policy_dist == "beta":
+                # BETA MODE (3-tuple return): action already in [0, 1], no
+                # tanh/rescale needed since Beta's support matches the bounds.
+                feats = self.feature_extractor_policy(x)
+                raw = self.policy_head(feats)  # [batch, 2 * action_size]
+                raw_alpha, raw_beta = raw.chunk(2, dim=-1)  # each [batch, action_size]
+                # softplus(.) + 1.0 keeps alpha, beta >= 1: unimodal/concave Beta,
+                # near-uniform at init (matches orthogonal gain=0.01 init).
+                alpha = F.softplus(raw_alpha) + 1.0
+                beta = F.softplus(raw_beta) + 1.0
+                dist = torch.distributions.Beta(alpha, beta)
+                action = dist.rsample()  # already in [0, 1]
+
+                return action, alpha, beta
 
             else:
                 # STANDARD PPO MODE (3-tuple return)

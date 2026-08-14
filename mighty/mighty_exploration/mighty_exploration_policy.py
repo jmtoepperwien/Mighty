@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import numpy as np
 import torch
-from torch.distributions import Categorical, Normal
+from torch.distributions import Beta, Categorical, Normal
 
 
 
@@ -107,6 +107,15 @@ class MightyExplorationPolicy:
 
         # ─── Continuous action branches ─────────────────────────────────────
         out = self.model(state)
+
+        # Beta's (action, alpha, beta) is also a 3-tuple, so it must be
+        # discriminated by output_style before the tuple-length dispatch below,
+        # not by len(out), or it collides with the standard-PPO 3-tuple.
+        if getattr(self.model, "output_style", None) == "beta":
+            action, alpha, beta = out
+            dist = Beta(alpha, beta)
+            log_prob = dist.log_prob(action).sum(dim=-1)
+            return action.detach().cpu().numpy(), log_prob
 
         # NEW: Handle 3-tuple (Standard PPO)
         if isinstance(out, tuple) and len(out) == 3:

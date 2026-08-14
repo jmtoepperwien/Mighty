@@ -6,7 +6,7 @@ from typing import Tuple
 
 import numpy as np
 import torch
-from torch.distributions import Categorical, Normal
+from torch.distributions import Beta, Categorical, Normal
 
 from mighty.mighty_exploration.mighty_exploration_policy import (
     MightyExplorationPolicy,
@@ -68,6 +68,20 @@ class StochasticPolicy(MightyExplorationPolicy):
             model_output = self.model(state)
 
             # Handle different model output formats
+
+            # Beta's (action, alpha, beta) is also a 3-tuple, so it must be
+            # discriminated by output_style before the tuple-length dispatch below,
+            # not by len(model_output), or it collides with the standard-PPO 3-tuple.
+            if getattr(self.model, "output_style", None) == "beta":
+                action, alpha, beta = model_output
+                dist = Beta(alpha, beta)
+                log_prob = dist.log_prob(action).sum(dim=-1, keepdim=True)
+
+                if return_logp:
+                    return action.detach().cpu().numpy(), log_prob
+                else:
+                    weighted_log_prob = log_prob * self.entropy_coefficient
+                    return action.detach().cpu().numpy(), weighted_log_prob
 
             # NEW: 3-tuple case (Standard PPO): (action, mean, log_std)
             if isinstance(model_output, tuple) and len(model_output) == 3:

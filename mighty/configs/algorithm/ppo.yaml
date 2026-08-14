@@ -4,6 +4,7 @@ algorithm: PPO
 algorithm_kwargs:
   rescale_action: False
   tanh_squash: False
+  policy_dist: gaussian
 
   rollout_buffer_class:
     _target_: mighty.mighty_replay.MightyRolloutBuffer
